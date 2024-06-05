@@ -1,4 +1,4 @@
-module github.com/globusdigital/soap
+module github.com/axeljb/soap
 
 go 1.19
 

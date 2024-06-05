@@ -195,20 +195,22 @@ func (c *Client) Call(ctx context.Context, soapAction string, request, response 
 			return httpResponse, nil // Empty responses are ok. Sometimes Sometimes only a Status 200 or 202 comes back
 		}
 		// There is a message body, but it's not SOAP. We cannot handle this!
-		switch c.SoapVersion {
-		case SoapVersion12:
-			if !bytes.Contains(rawBody, []byte(`soap-envelope`)) { // not quite sure if correct to assert on soap-...
-				if c.Log != nil {
-					c.Log("This is not a 1.2 SOAP-Message", "log_trace_id", logTraceID, "response_bytes", rawBody)
+		if strictPrefixCheck {
+			switch c.SoapVersion {
+			case SoapVersion12:
+				if !bytes.Contains(rawBody, []byte(`soap-envelope`)) { // not quite sure if correct to assert on soap-...
+					if c.Log != nil {
+						c.Log("This is not a 1.2 SOAP-Message", "log_trace_id", logTraceID, "response_bytes", rawBody)
+					}
+					return nil, fmt.Errorf("this is not a 1.2 SOAP-Message: %q", string(rawBody))
 				}
-				return nil, fmt.Errorf("this is not a 1.2 SOAP-Message: %q", string(rawBody))
-			}
-		default:
-			if !(bytes.Contains(rawBody, soapPrefixTagLC) || bytes.Contains(rawBody, soapPrefixTagUC)) {
-				if c.Log != nil {
-					c.Log("This is not a 1.1 SOAP-Message", "log_trace_id", logTraceID, "response_bytes", rawBody)
+			default:
+				if !(bytes.Contains(rawBody, soapPrefixTagLC) || bytes.Contains(rawBody, soapPrefixTagUC)) {
+					if c.Log != nil {
+						c.Log("This is not a 1.1 SOAP-Message", "log_trace_id", logTraceID, "response_bytes", rawBody)
+					}
+					return nil, fmt.Errorf("this is not a 1.1 SOAP-Message: %q", string(rawBody))
 				}
-				return nil, fmt.Errorf("this is not a 1.1 SOAP-Message: %q", string(rawBody))
 			}
 		}
 	}
@@ -314,8 +316,9 @@ func formatFaultXML(xmlBytes []byte, startLevel int) string {
 }
 
 var (
-	soapPrefixTagUC = []byte("<SOAP")
-	soapPrefixTagLC = []byte("<soap")
+	soapPrefixTagUC   = []byte("<SOAP")
+	soapPrefixTagLC   = []byte("<soap")
+	strictPrefixCheck = false
 )
 
 func replaceSoap12to11(data []byte) []byte {
